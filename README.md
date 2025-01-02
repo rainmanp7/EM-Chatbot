@@ -6,7 +6,7 @@ Emergent Entity Chatbot
 
 
 Information about the Archieved File.
-
+(( 1 EMchatbotv5 minimal.7z ))
 Conclusion for the archived working chatbot file.
 
 This archived version focuses on rule-based interactions rather than  
