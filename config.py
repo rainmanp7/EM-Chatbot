@@ -21,6 +21,7 @@ ERROR_MESSAGES = {
     'invalid_expression': "Invalid math expression. Please check your input."
 }
 
+
 # Test for config.py
 if __name__ == "__main__":
     print("Testing config.py...")
