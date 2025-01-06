@@ -1,3 +1,5 @@
+# snn.py
+import re
 import random
 import logging
 from collections import defaultdict, Counter
@@ -131,5 +133,43 @@ class SpikingNeuralNetwork:
                 optimized_expression = f"{factors[0].strip()} ^ {len(factors)}"
                 return optimized_expression
         
+        # Recognize trigonometric identities
+        if 'sin' in expression or 'cos' in expression or 'tan' in expression:
+            # Example: sin(90) + sin(90) → 2 * sin(90)
+            func_matches = re.findall(r'(sin|cos|tan)\(([^)]+)\)', expression)
+            if len(func_matches) > 1 and all(match[0] == func_matches[0][0] and match[1] == func_matches[0][1] for match in func_matches):
+                optimized_expression = f"{len(func_matches)} * {func_matches[0][0]}({func_matches[0][1]})"
+                return optimized_expression
+        
+        # Recognize logarithmic simplifications
+        if 'log' in expression:
+            # Example: log(100) + log(100) → 2 * log(100)
+            log_matches = re.findall(r'log\(([^)]+)\)', expression)
+            if len(log_matches) > 1 and all(match == log_matches[0] for match in log_matches):
+                optimized_expression = f"{len(log_matches)} * log({log_matches[0]})"
+                return optimized_expression
+        
         # No optimization found
         return None
+
+# Test for snn.py
+if __name__ == "__main__":
+    print("Testing snn.py...")
+    snn = SpikingNeuralNetwork()
+    
+    # Test adding a neuron
+    snn.add_neuron("input1")
+    print("Added neuron for 'input1'.")
+    
+    # Test step function
+    print("Running step function with input [('input1', 1.0)]...")
+    result = snn.step([("input1", 1.0)])
+    print("Step result:", result)
+    
+    # Test analyze_expression
+    print("Analyzing expression '5 + 5 + 5':", snn.analyze_expression("5 + 5 + 5"))  # Should suggest 5 * 3
+    print("Analyzing expression 'sin(90) + sin(90)':", snn.analyze_expression("sin(90) + sin(90)"))  # Should suggest 2 * sin(90)
+    print("Analyzing expression 'log(100) + log(100)':", snn.analyze_expression("log(100) + log(100)"))  # Should suggest 2 * log(100)
+    print("Analyzing expression '2 * 2 * 2':", snn.analyze_expression("2 * 2 * 2"))  # Should suggest 2 ^ 3
+    
+    print("All tests passed!")

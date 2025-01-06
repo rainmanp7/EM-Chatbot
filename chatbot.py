@@ -1,130 +1,77 @@
-import math
-import re
+# chatbot.py
+from math_utils import MathUtils
+from language_utils import LanguageUtils
 from snn import SpikingNeuralNetwork
+from test_suite import test_cases  # Import the test cases
 
 class ChatBot:
     def __init__(self):
         self.snn = SpikingNeuralNetwork()
-        self.variables = {}
-        self.supported_functions = {
-            'sqrt': math.sqrt,
-            'log': math.log,
-            'log10': math.log10,
-            'sin': math.sin,
-            'cos': math.cos,
-            'tan': math.tan,
-            'pi': math.pi,
-            'e': math.e
-        }
-        self.supported_operations = ['+', '-', '*', '/', '^']
+        self.math_utils = MathUtils()
+        self.language_utils = LanguageUtils()
+        self.run_test_suite()  # Run the test suite upon initialization
 
-    def _validate_variable_name(self, var_name: str) -> str | None:
-        """Validate if a variable name is alphanumeric and starts with a letter."""
-        if not var_name.isidentifier():
-            return f"Invalid variable name: '{var_name}'. Variable names must be alphanumeric and start with a letter."
-        return None
-
-    def _validate_math_expression(self, expression: str) -> str | None:
-        """Validate the math expression for allowed characters, operations, and function arguments."""
-        # Check for incomplete operations
-        if any(op in expression[-1] for op in self.supported_operations):
-            return "Incomplete math expression. Please provide a complete operation."
-
-        # Check for allowed characters and defined functions/constants
-        pattern = r'^[\d\s\+\-\*\/\^\(\)\.e' + ''.join(self.supported_functions.keys()) + 'xyz]+$'
-        if not re.match(pattern, expression, re.IGNORECASE):
-            return "Invalid characters in the math expression. Only numbers, math operations, and defined functions/constants are allowed."
-
-        # Validate function arguments
-        func_matches = re.findall(rf"({'|'.join(self.supported_functions.keys())})\((.*?)\)", expression, re.IGNORECASE)
-        for func, arg in func_matches:
-            if not (arg.replace('.', '', 1).isdigit() or arg in self.variables):
-                return f"Invalid argument '{arg}' for function '{func}'. Only numbers or defined variables are allowed."
-
-        return None
-
-    def _parse_and_evaluate_expression(self, expression: str) -> float:
-        """Replace supported functions and constants, then evaluate the expression."""
-        for func, value in self.supported_functions.items():
-            expression = expression.replace(func, f'math.{func}')
-        expression = expression.replace('^', '**')
-        
-        try:
-            result = eval(expression, {"__builtins__": None}, {"math": math, **self.variables})
-            
-            # Trigger the SNN to analyze the expression
-            self.snn.step([("math_operation", expression)])
-            
-            # Check if the SNN suggests an optimization
-            optimized_expression = self.snn.analyze_expression(expression)
-            if optimized_expression and optimized_expression != expression:
-                print(f"SNN suggests optimizing: {expression} → {optimized_expression}")
-                result = eval(optimized_expression, {"__builtins__": None}, {"math": math, **self.variables})
-            
-            return result
-        except ZeroDivisionError:
-            raise ValueError("Division by zero is not allowed.")
-        except NameError as e:
-            raise NameError(f"Undefined variable '{str(e).split(' ')[1]}'. Please assign a value to it first.")
-        except SyntaxError:
-            raise SyntaxError("Invalid math expression. Please check your input.")
-        except Exception as e:
-            raise ValueError(f"Error evaluating math expression: {e}")
+    def run_test_suite(self):
+        """Run the test suite and print the results."""
+        print("Running test suite...")
+        for test_case in test_cases:
+            print(f"\nTest Case: {test_case}")
+            response = self.respond(test_case)
+            print(response)
+        print("\nTest suite completed.")
 
     def respond(self, user_input: str) -> str:
-        """Handle user input: variable assignment or math expression evaluation."""
+        """Handle user input: variable assignment, math expression evaluation, or natural language math."""
         try:
-            if '=' in user_input:
+            if user_input.strip() == "get_variables":
+                return self.get_variables()
+            elif '=' in user_input:
                 var_name, var_value = user_input.split('=', 1)
                 var_name, var_value = var_name.strip(), var_value.strip()
-                error = self._validate_variable_name(var_name)
+                error = self.math_utils.math_validate.validate_variable_name(var_name)
                 if error:
                     raise ValueError(error)
-                self.variables[var_name] = float(var_value)
+                self.math_utils.set_variable(var_name, float(var_value))
                 return f"Bot: Variable '{var_name}' set to {var_value}."
-            error = self._validate_math_expression(user_input)
-            if error:
-                raise ValueError(error)
-            result = self._parse_and_evaluate_expression(user_input)
-            return f"Bot: The result is {result}."
+            elif self.language_utils.is_math_question(user_input):
+                math_expr = self.language_utils.convert_to_math(user_input)
+                print(f"Debug: Converted '{user_input}' to '{math_expr}'")  # Debug print
+                # Skip validation for natural language inputs
+                result = self.math_utils._parse_and_evaluate_expression(math_expr)
+                # Suggest optimizations using the SNN
+                optimized_expr = self.snn.analyze_expression(math_expr)
+                if optimized_expr:
+                    return f"Bot: The result is {result}. Suggested optimization: {optimized_expr}"
+                else:
+                    return f"Bot: The result is {result}."
+            elif 'd/dx' in user_input or 'integrate' in user_input:
+                return self.math_utils.evaluate_calculus(user_input)
+            elif 'det' in user_input or 'inv' in user_input:
+                return self.math_utils.evaluate_linear_algebra(user_input)
+            else:
+                error = self.math_utils.math_validate.validate_math_expression(user_input)
+                if error:
+                    raise ValueError(error)
+                result = self.math_utils._parse_and_evaluate_expression(user_input)
+                # Suggest optimizations using the SNN
+                optimized_expr = self.snn.analyze_expression(user_input)
+                if optimized_expr:
+                    return f"Bot: The result is {result}. Suggested optimization: {optimized_expr}"
+                else:
+                    return f"Bot: The result is {result}."
         except (ValueError, ZeroDivisionError, SyntaxError, NameError, Exception) as e:
             return f"Bot: Error - {e}"
 
     def get_variables(self) -> str:
         """Return a formatted string of currently defined variables."""
-        if not self.variables:
+        variables = self.math_utils.get_variables()
+        if not variables:
             return "Bot: No variables defined."
         var_string = "Bot: Defined Variables:\n"
-        for var, value in self.variables.items():
+        for var, value in variables.items():
             var_string += f"- {var}: {value}\n"
         return var_string
 
+# Main entry point to run the chatbot
 if __name__ == "__main__":
-    chatbot = ChatBot()
-    
-    # Test suite
-    test_cases = [
-        "5 * 6", "12 - 7", "2^e", "sqrt(56)", 
-        "x = 10", "x + 7", "5+", "valid_var = 5", 
-        "log(5)", "5 / 0", "sqrt(abcd)", "y + 10", 
-        "log(100)", "(5 + 3) * 4", "sin(90)", 
-        "get_variables"
-    ]
-    for case in test_cases:
-        print(f"User: {case}")
-        if case.lower() == "get_variables":
-            print(chatbot.get_variables())
-        else:
-            print(chatbot.respond(case))
-        print("-" * 20)
-
-    # Interactive mode
-    print("Entering interactive mode. Type 'exit' or 'quit' to end.")
-    while True:
-        user_input = input("You: ")
-        if user_input.lower() in ['exit', 'quit']:
-            break
-        if user_input.lower() == "get_variables":
-            print(chatbot.get_variables())
-        else:
-            print(chatbot.respond(user_input))
+    chatbot = ChatBot()  # This will automatically run the test suite
