@@ -4,6 +4,7 @@ from language_utils import LanguageUtils
 from snn import SpikingNeuralNetwork
 from test_suite import test_cases  # Import the test cases
 
+
 class ChatBot:
     def __init__(self):
         self.snn = SpikingNeuralNetwork()
@@ -72,6 +73,17 @@ class ChatBot:
             var_string += f"- {var}: {value}\n"
         return var_string
 
+
 # Main entry point to run the chatbot
 if __name__ == "__main__":
     chatbot = ChatBot()  # This will automatically run the test suite
+
+    # Interactive loop for user input
+    print("\nChatBot is ready! Type your math expressions or commands. Type 'exit' to quit.")
+    while True:
+        user_input = input("You: ")
+        if user_input.strip().lower() == "exit":
+            print("Bot: Goodbye!")
+            break
+        response = chatbot.respond(user_input)
+        print(response)
